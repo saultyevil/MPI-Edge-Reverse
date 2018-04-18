@@ -24,8 +24,11 @@ $ ./edge2image
 
 ## Configuration File
 
-* `MAX_ITERS` - the maximum number of iterations the program should compute for.
-* `OUTPUT_FREQ` - how often a progress report should be printed to screen. This is also the frequency at which the program checks to see if the image has been converted sucessfully.
-* `DELTA` - the criterion for the maximum change between two iterations for the conversion processes to stop.
-* `INPUT_FILENAME` - the path to the edge image.
-* `OUTPUT_FILENAME` - the path to where the converted image should be saved.
+* `MAX_ITERS` - the maximum number of iterations to compute.
+* `CHECK_FREQ` - how often the program should check to see if the program has converted the image to a specified accuracy.
+* `OUTPUT_FREQ` - how often the progress report should print, i.e. how often it should print how many iterations are complete.
+* `DELTA` - the stopping criterion. If the largest difference between two pixels is smaller than this value, the image has reached the desired accuracy between iterations.
+* `INPUT_FILENAME` - the path to the input image.
+* `OUTPUT_FILENAME` - the path to the output image.
+* `VERBOSE` - enable to see more information printed to the screen.
+* 

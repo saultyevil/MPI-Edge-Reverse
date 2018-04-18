@@ -39,8 +39,8 @@ int read_string(char par_string[], char *parameter);
 /*
  * Constants for Cartesian topology -- MPI_Cart_create, MPI_Dim_create etc
  */
-#define NDIMS 2
-#define XDIR 1
+#define NDIMS 1
+#define XDIR 0
 #define YDIR 0
 
 /*
@@ -55,7 +55,13 @@ int read_string(char par_string[], char *parameter);
 /*
  * Constants for parameter IO
  */
-#define INI_FILE "image.ini"
+#define INI_FILE "edge2image.ini"
 #define NO_PAR_CONST -1
 #define STRING_NO_PAR_CONST '\0'
 #define MAX_LINE 128
+
+/*
+ * Other constants
+ */
+#define TRUE 1
+#define FALE 0

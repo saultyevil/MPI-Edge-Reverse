@@ -26,7 +26,7 @@ read_double(char par_string[], double *parameter)
 
     if ((par_file = fopen(INI_FILE, "r")) == NULL)
     {
-        printf("Cannot open parameter file 'plane.ini'.\n");
+        printf("Cannot open parameter file '%s'.\n", INI_FILE);
         exit(-1);
     }
 
@@ -110,7 +110,7 @@ read_int(char par_string[], int *parameter)
 
     if ((par_file = fopen(INI_FILE, "r")) == NULL)
     {
-        printf("Cannot open parameter file 'plane.ini'.\n");
+        printf("Cannot open parameter file '%s'.\n", INI_FILE);
         exit(-1);
     }
 
@@ -193,7 +193,7 @@ read_string(char par_string[], char *parameter)
 
     if ((par_file = fopen(INI_FILE, "r")) == NULL)
     {
-        printf("Cannot open parameter file 'plane.ini'.\n");
+        printf("Cannot open parameter file '%s'.\n", INI_FILE);
         exit(-1);
     }
 
