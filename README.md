@@ -31,4 +31,3 @@ $ ./edge2image
 * `INPUT_FILENAME` - the path to the input image.
 * `OUTPUT_FILENAME` - the path to the output image.
 * `VERBOSE` - enable to see more information printed to the screen.
-* 

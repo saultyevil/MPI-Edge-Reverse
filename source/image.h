@@ -1,3 +1,5 @@
+#include <mpi.h>
+
 /* **************************************************************************
  * FUNCTION DEFINITIONS
  * ************************************************************************** */
@@ -18,11 +20,27 @@ void *arralloc(size_t size, int ndim, ...);
 
 /*
  * Functions for taking in variable from external parameter files -- some code
- * I """stole""" from one of my other projects
+ * I """borrowed""" from one of my other projects
  */
-int read_double(char par_string[], double *parameter);
-int read_int(char par_string[], int *parameter);
-int read_string(char par_string[], char *parameter);
+int read_double(char *par_string, double *parameter);
+int read_int(char *par_string, int *parameter);
+int read_string(char *par_string, char *parameter);
+
+/*
+ * Function used to split up the main function
+ */
+int compute_iterations(double **old, double **new, double **edge, int *nbrs,
+    int nx_proc, int ny_proc, int proc, int max_iters, double delta_stop,
+    int check_freq, int out_freq, int verbose, MPI_Comm cart_comm);
+
+MPI_Comm create_topology(int *dims, int *dim_period, int *nbrs, int nx, int ny,
+         int *nx_proc, int *ny_proc, int *proc, int n_procs, int reorder,
+         int displacement);
+
+int init_arrays(double **edge, double **old, double **buff, int nx_proc,
+    int ny_proc);
+
+int mcopy_to_buff(double **old, double **buff, int nx_proc, int ny_proc);
 
 /* **************************************************************************
  * CONSTANT DEFINITIONS

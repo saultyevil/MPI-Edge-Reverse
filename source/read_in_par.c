@@ -17,7 +17,7 @@
  */
 
 int
-read_double(char par_string[], double *parameter)
+read_double(char *par_string, double *parameter)
 {
     char line[MAX_LINE], ini_par_name[MAX_LINE], par_separator[MAX_LINE];
     char par_value[MAX_LINE];
@@ -101,7 +101,7 @@ read_double(char par_string[], double *parameter)
  */
 
 int
-read_int(char par_string[], int *parameter)
+read_int(char *par_string, int *parameter)
 {
     char line[MAX_LINE], ini_par_name[MAX_LINE], par_separator[MAX_LINE];
     char par_value[MAX_LINE];
@@ -184,7 +184,7 @@ read_int(char par_string[], int *parameter)
  */
 
 int
-read_string(char par_string[], char *parameter)
+read_string(char *par_string, char *parameter)
 {
     char line[MAX_LINE], ini_par_name[MAX_LINE], par_separator[MAX_LINE];
     char par_value[MAX_LINE];
