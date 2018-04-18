@@ -2,7 +2,8 @@
 #include <math.h>
 #include <mpi.h>
 
-#include "image.h"
+#include "image_constants.h"
+#include "image_functions.h"
 
 /* **************************************************************************
  * Computes all the iterations required to convert the image

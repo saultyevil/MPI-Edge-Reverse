@@ -2,7 +2,8 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include "image.h"
+#include "image_constants.h"
+#include "image_functions.h"
 
 /** @brief Read in a double from an external file.
  *

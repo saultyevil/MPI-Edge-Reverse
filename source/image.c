@@ -3,19 +3,17 @@
 #include <math.h>
 #include <mpi.h>
 
-#include "image.h"
+#include "image_constants.h"
+#include "image_functions.h"
 
 int
 main(int argc, char *argv[])
 {
-    int i, j, iter, n_iters, check_freq, out_freq, proc, n_procs, verbose;
-    int nx, ny, nx_proc, ny_proc;
-    int *dims, *dim_period, *nbrs;
-
+    int iter, n_iters, check_freq, out_freq, verbose;
+    int nx, ny, nx_proc, ny_proc, proc, n_procs;
+    double delta_stopping;
     char *in_filename = malloc(sizeof(*in_filename) * MAX_LINE);
     char *out_filename = malloc(sizeof(*out_filename) * MAX_LINE);
-
-    double delta_stopping;
 
     MPI_Comm cart_comm;
 
@@ -37,6 +35,7 @@ main(int argc, char *argv[])
     read_double("DELTA", &delta_stopping);
     read_string("INPUT_FILENAME", in_filename);
     read_string("OUTPUT_FILENAME", out_filename);
+
     pgmsize(in_filename, &nx, &ny);
     double **master_buff = arralloc(sizeof(*master_buff), 2, nx, ny);
 
@@ -48,8 +47,9 @@ main(int argc, char *argv[])
                in_filename, out_filename, nx, ny);
         printf("MAX_ITERS: %d\nCHECK_FREQ: %d\nOUTPUT_FREQ: %d\nDELTA: %4.2f\n",
                n_iters, check_freq, out_freq, delta_stopping);
-        printf("VERBOSE: %d\nN_PROCS: %d\n", verbose, n_procs);
-        printf("----------------------\n\n");
+        printf("VERBOSE: %d\nNDIMS: %d\nN_PROCS: %d\n", verbose, NDIMS,
+               n_procs);
+        printf("----------------------\n");
     }
 
     free(in_filename);
@@ -62,11 +62,25 @@ main(int argc, char *argv[])
      * MPI_Cart_shift
      */
     int reorder = 0, disp = 1;
-    nbrs = malloc(sizeof(*nbrs) * N_NBRS);
-    dims = malloc(sizeof(*dims) * NDIMS);
-    dim_period = malloc(sizeof(*dim_period) * NDIMS);
-    cart_comm = create_topology(dims, dim_period, nbrs, nx, ny, &nx_proc,
-                                &ny_proc, &proc, n_procs, reorder, disp);
+    int *nbrs = malloc(sizeof(*nbrs) * N_NBRS);
+    int *dims = malloc(sizeof(*dims) * NDIMS);
+    int *dim_period = malloc(sizeof(*dim_period) * NDIMS);
+    int *coords = malloc(sizeof(*coords) * NDIMS);
+    int *bounds = malloc(sizeof(*bounds) * N_NBRS);
+
+    /*
+     * If NDIMS is too large or small, the program will exit in this function
+     */
+    cart_comm = create_topology(dims, dim_period, nbrs, coords, nx, ny,
+                                &nx_proc, &ny_proc, &proc, n_procs,
+                                reorder, disp);
+
+    /*
+     * Print out the dimensions and coordinates of each rank if verbose output
+     * is used.
+     */
+    if (verbose == TRUE)
+        print_dims_coords(dims, coords, proc, n_procs, cart_comm);
 
     /*
      * Allocate memory for all of the arrays -- use arralloc because it keeps
@@ -78,10 +92,24 @@ main(int argc, char *argv[])
     double **edge = arralloc(sizeof(*edge), 2, nx_proc+2, ny_proc+2);
 
     /*
-     * DON'T USE MPI SCATTER!!!!
+     * Distribute masterbuff into smaller buffs for each process running
      */
-    MPI_Scatter(&master_buff[0][0], nx_proc*ny_proc, MPI_DOUBLE, &buff[0][0],
-                nx_proc*ny_proc, MPI_DOUBLE, MASTER_PROCESS, cart_comm);
+    if (NDIMS == 1)
+    {
+        /*
+         * For 1 dimension, just use the good ol' MPI_Scatter
+         */
+        MPI_Scatter(&master_buff[0][0], nx_proc*ny_proc, MPI_DOUBLE,
+                    &buff[0][0], nx_proc*ny_proc, MPI_DOUBLE, MASTER_PROCESS,
+                    cart_comm);
+    }
+    else if (NDIMS == 2)
+    {
+        calculate_boundaries(bounds, coords, nx_proc, ny_proc, proc);
+
+        if (verbose == TRUE)
+            print_coord_boundaries(bounds, coords, proc, n_procs, cart_comm);
+    }
 
     /*
      * Copy the buffer array (containing the image) to the edge array and
@@ -91,10 +119,14 @@ main(int argc, char *argv[])
     init_arrays(edge, old, buff, nx_proc, ny_proc);
 
     /*
-     * Compute the iterations
+     * Compute the iterations -- time them for parallel computation comparison
      */
+    double parallel_start = MPI_Wtime();
+
     compute_iterations(old, new, edge, nbrs, nx_proc, ny_proc, proc, n_iters,
         delta_stopping, check_freq, out_freq, verbose, cart_comm);
+
+    double parallel_end = MPI_Wtime();
 
     /*
      * Copy the image into the buffer -- excluding halo cells
@@ -103,30 +135,44 @@ main(int argc, char *argv[])
 
     free(dims);
     free(dim_period);
+    free(coords);
+    free(bounds);
     free(nbrs);
     free(old);
     free(new);
     free(edge);
 
     /*
-     * DON'T USE MPI GATHER!!!
+     * Gather all the buff's back into the masterbuff on the master process
      */
-    MPI_Gather(&buff[0][0], nx_proc*ny_proc, MPI_DOUBLE, &master_buff[0][0],
-               nx_proc*ny_proc, MPI_DOUBLE, MASTER_PROCESS, cart_comm);
+    if (NDIMS == 1)
+    {
+        /*
+         * For 1 dimension, just use the good ol' MPI_Gather
+         */
+        MPI_Gather(&buff[0][0], nx_proc*ny_proc, MPI_DOUBLE, &master_buff[0][0],
+                   nx_proc*ny_proc, MPI_DOUBLE, MASTER_PROCESS, cart_comm);
+    }
+    else if (NDIMS == 2)
+    {
+        if (proc == MASTER_PROCESS)
+        {
+            printf("NDIMS: %d: not implemented yet!\n", NDIMS);
+        }
+    }
 
     MPI_Finalize();
-
     free(buff);
 
     if (proc == MASTER_PROCESS)
     {
         pgmwrite(out_filename, &master_buff[0][0], nx, ny);
+        printf("Time required for image conversion: %9.6f seconds.\n\n",
+            (parallel_end - parallel_start));
+        free(master_buff);
     }
 
     free(out_filename);
-
-    if (proc == MASTER_PROCESS)
-        free(master_buff);
 
     return 0;
 }

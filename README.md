@@ -2,7 +2,7 @@
 
 ## Description
 
-The aim of this program is to covert an image of edge data into its original image by iteratively computing the graident of a pixel compared to its four neighbouring pixels. Input images are expected to be in the `.pgm` format and as such, output images will also be output in this format.
+The aim of this program is to covert an image of edge data into its original image by iteratively computing the gradient of a pixel compared to its four neighbouring pixels. Input images are expected to be in the `.pgm` format and as such, output images will also be output in this format.
 
 The input image is decomposed into a 2D array of processes, each computing their own iterations to convert the image back to its original. Users can set a maximum number of iterations to covert back to the original image, however the program will end when it has detected that the difference between iterations is smaller than a defined criterion.
 
@@ -20,6 +20,13 @@ To use program once it is built, you will need to configure the configuration fi
 
 ```bash
 $ ./edge2image
+```
+
+Users are able to switch between 1-D decomposition and 2-D decomposition by changing the constant `NDIMS` in the file `source/image_constants.h`. However, for this to be successful it is recommended to recompile all of the source (my Makefile isn't smart enough to compensate for this... yet.).
+
+```bash
+$ make clean
+$ make
 ```
 
 ## Configuration File
