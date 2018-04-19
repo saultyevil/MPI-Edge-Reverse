@@ -43,6 +43,7 @@ $ make
 
 In general it is best to use either 1, 2, 4, 8, 16, 32 or 64 processes. 128 can also work for the bigger images provided. Check the list below for more available process numbers for each image.
 
+```
 x[0] = 192.0 y[0] = 128.0: both divisible by 1
 x[0] = 192.0 y[0] = 128.0: both divisible by 2
 x[0] = 192.0 y[0] = 128.0: both divisible by 4

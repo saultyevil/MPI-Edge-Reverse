@@ -89,7 +89,7 @@ main(int argc, char *argv[])
         && (proc == MASTER_PROCESS))
     {
         printf("\nImage is not cleanly divisible into an equal squares.\n");
-        printf("Please use NDIMS = 1 in image_constants.h. or change the");
+        printf("Try using NDIMS = 1 in image_constants.h or change the");
         printf(" number of processes in use.\n\n");
         exit(1);
     }
