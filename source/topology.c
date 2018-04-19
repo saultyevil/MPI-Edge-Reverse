@@ -20,7 +20,7 @@ create_topology(int ndims, int *dims, int *dim_period, int *nbrs, int *coords,
     int i;
     MPI_Comm cart_comm;
 
-    for (i = 0; i < NDIMS; i++)
+    for (i = 0; i < ndims; i++)
     {
         dims[i] = 0;
         dim_period[i] = 0;

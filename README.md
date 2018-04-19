@@ -38,3 +38,52 @@ $ make
 * `INPUT_FILENAME` - the path to the input image.
 * `OUTPUT_FILENAME` - the path to the output image.
 * `VERBOSE` - enable to see more information printed to the screen.
+
+## Acceptable process number
+
+In general it is best to use either 1, 2, 4, 8, 16, 32 or 64 processes. 128 can also work for the bigger images provided. Check the list below for more available process numbers for each image.
+
+x[0] = 192.0 y[0] = 128.0: both divisible by 1
+x[0] = 192.0 y[0] = 128.0: both divisible by 2
+x[0] = 192.0 y[0] = 128.0: both divisible by 4
+x[0] = 192.0 y[0] = 128.0: both divisible by 8
+x[0] = 192.0 y[0] = 128.0: both divisible by 16
+x[0] = 192.0 y[0] = 128.0: both divisible by 32
+x[0] = 192.0 y[0] = 128.0: both divisible by 64
+
+x[1] = 256.0 y[1] = 192.0: both divisible by 1
+x[1] = 256.0 y[1] = 192.0: both divisible by 2
+x[1] = 256.0 y[1] = 192.0: both divisible by 4
+x[1] = 256.0 y[1] = 192.0: both divisible by 8
+x[1] = 256.0 y[1] = 192.0: both divisible by 16
+x[1] = 256.0 y[1] = 192.0: both divisible by 32
+x[1] = 256.0 y[1] = 192.0: both divisible by 64
+
+x[2] = 512.0 y[2] = 384.0: both divisible by 1
+x[2] = 512.0 y[2] = 384.0: both divisible by 2
+x[2] = 512.0 y[2] = 384.0: both divisible by 4
+x[2] = 512.0 y[2] = 384.0: both divisible by 8
+x[2] = 512.0 y[2] = 384.0: both divisible by 16
+x[2] = 512.0 y[2] = 384.0: both divisible by 32
+x[2] = 512.0 y[2] = 384.0: both divisible by 64
+x[2] = 512.0 y[2] = 384.0: both divisible by 128
+
+x[3] = 768.0 y[3] = 768.0: both divisible by 1
+x[3] = 768.0 y[3] = 768.0: both divisible by 2
+x[3] = 768.0 y[3] = 768.0: both divisible by 3
+x[3] = 768.0 y[3] = 768.0: both divisible by 4
+x[3] = 768.0 y[3] = 768.0: both divisible by 6
+x[3] = 768.0 y[3] = 768.0: both divisible by 8
+x[3] = 768.0 y[3] = 768.0: both divisible by 12
+x[3] = 768.0 y[3] = 768.0: both divisible by 16
+x[3] = 768.0 y[3] = 768.0: both divisible by 24
+x[3] = 768.0 y[3] = 768.0: both divisible by 32
+x[3] = 768.0 y[3] = 768.0: both divisible by 48
+x[3] = 768.0 y[3] = 768.0: both divisible by 64
+x[3] = 768.0 y[3] = 768.0: both divisible by 96
+x[3] = 768.0 y[3] = 768.0: both divisible by 128
+x[3] = 768.0 y[3] = 768.0: both divisible by 192
+x[3] = 768.0 y[3] = 768.0: both divisible by 256
+x[3] = 768.0 y[3] = 768.0: both divisible by 384
+x[3] = 768.0 y[3] = 768.0: both divisible by 768
+```

@@ -32,15 +32,15 @@ int read_string(char *par_string, char *parameter);
 MPI_Comm create_topology(int ndims, int *dims, int *dim_period, int *nbrs,
          int *coords, int nx, int ny, int *nx_proc, int *ny_proc, int *proc,
          int n_procs, int reorder, int displacement);
+double find_average_pixels(double **array, int nx, int ny);
 
 /*
  * Functions for verbose printing
  */
-int print_coords(int *coords, int proc, int n_procs);
-int print_dims(int *dims, int proc);
-int print_boundaries(int *bounds, int *coords, int proc, int n_procs);
+int print_coords(int *coords, int proc, int n_procs, int ndims);
+int print_dims(int *dims, int proc, int ndims);
 int print_dims_coords(int *dims, int *coords, int proc, int n_procs,
-    MPI_Comm comm);
+    MPI_Comm comm, int ndims);
 int print_coord_boundaries(int *bounds, int *coords, int proc, int n_procs,
     MPI_Comm comm);
 int print_n_proc(int proc, int nx, int ny);

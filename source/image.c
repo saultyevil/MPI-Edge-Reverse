@@ -9,17 +9,22 @@
 int
 main(int argc, char *argv[])
 {
-    int i, j, ii, jj, iter, p_iter, r_iter, n_iters, check_freq, out_freq;
-    int verbose, nx, ny, nx_proc, ny_proc, proc, n_procs;
-    int x_dim, y_dim, x_dim_start, y_dim_start, use_ndim1 = FALSE;
+        int verbose;  // var for enabling verbose output
+    int i, j, ii, jj, iter, p_iter, r_iter;  // vars for iterations
+    int n_iters, check_freq, out_freq;       // vars for output
+    int nx, ny, nx_proc, ny_proc, proc, n_procs;  // vars for processes
+    int x_dim, y_dim, x_dim_start, y_dim_start;  // vars for process domains
+
+    double pixel_average, pixel_average_procs;  // vars for average pixel
     double delta_stopping, delta_proc, max_delta_proc, max_delta_all_procs;
+
     char *in_filename = malloc(sizeof(*in_filename) * MAX_LINE);
     char *out_filename = malloc(sizeof(*out_filename) * MAX_LINE);
 
     MPI_Comm cart_comm;
     MPI_Status recv_status;
-    MPI_Datatype send_array_vector, send_halo_vector;
     MPI_Request proc_request;
+    MPI_Datatype send_array_vector, send_halo_vector;
 
     MPI_Init(NULL, NULL);
     MPI_Comm_rank(DEFAULT_COMM, &proc);
@@ -48,7 +53,7 @@ main(int argc, char *argv[])
                in_filename, out_filename, nx, ny);
         printf("MAX_ITERS: %d\nCHECK_FREQ: %d\nOUTPUT_FREQ: %d\nDELTA: %4.2f\n",
                n_iters, check_freq, out_freq, delta_stopping);
-        printf("VERBOSE: %d\nNDIMS: %d\nN_PROCS: %d\n", verbose, NDIMS,
+        printf("VERBOSE: %d\nNDIMS: %d\n\nN_PROCS: %d\n", verbose, NDIMS,
                n_procs);
         printf("----------------------\n");
     }
@@ -67,7 +72,6 @@ main(int argc, char *argv[])
     int *dims = malloc(sizeof(*dims) * NDIMS);
     int *dim_period = malloc(sizeof(*dim_period) * NDIMS);
     int *coords = malloc(sizeof(*coords) * NDIMS);
-    int *bounds = malloc(sizeof(*bounds) * N_NBRS);
 
     /*
      * If NDIMS is too large or small, the program will exit in this function
@@ -78,23 +82,16 @@ main(int argc, char *argv[])
 
     /*
      * When the domain can't be decomposed into a bunch of nice, even squares,
-     * the program should resort to using the NDIM = 1 case and decompose the
+     * the program should report to use the NDIM = 1 case and decompose the
      * domain into a series of strips
      */
-    if (nx % nx_proc != 0 || ny % ny_proc != 0)
+    if ((nx % nx_proc != 0 || ny % ny_proc != 0) &&  (NDIMS == 2) \
+        && (proc == MASTER_PROCESS))
     {
-        if (proc == MASTER_PROCESS)
-        {
-            printf("Error when trying to divide into nice, even squares.\n");
-            printf("1D domain decomposition to be used instead.\n");
-            printf("Verbose mode is also disabled.");
-        }
-
-        use_ndim1 = TRUE;
-        verbose = FALSE;
-        cart_comm = create_topology(1, dims, dim_period, nbrs, coords, nx,
-                                    ny, &nx_proc, &ny_proc, &proc, n_procs,
-                                    reorder, disp);  // re-create a new comm
+        printf("\nImage is not cleanly divisible into an equal squares.\n");
+        printf("Please use NDIMS = 1 in image_constants.h. or change the");
+        printf(" number of processes in use.\n\n");
+        exit(1);
     }
 
     /*
@@ -120,7 +117,7 @@ main(int argc, char *argv[])
     if (verbose == TRUE)
     {
         print_n_proc(proc, nx_proc, ny_proc);
-        print_dims_coords(dims, coords, proc, n_procs, cart_comm);
+        print_dims_coords(dims, coords, proc, n_procs, cart_comm, NDIMS);
     }
 
     /*
@@ -140,7 +137,7 @@ main(int argc, char *argv[])
     /*
      * Distribute masterbuff into smaller buffs for each process running
      */
-    if (NDIMS == 1 || use_ndim1 == TRUE)
+    if (NDIMS == 1)
     {
         /*
          * For 1 dimension, just use the good ol' MPI_Scatter
@@ -149,7 +146,7 @@ main(int argc, char *argv[])
                     &buff[0][0], nx_proc*ny_proc, MPI_DOUBLE, MASTER_PROCESS,
                     cart_comm);
     }
-    else if (NDIMS == 2 && use_ndim1 == FALSE)
+    else if (NDIMS == 2)
     {
         /*
          * Very bad and inefficient way of distributing the work :^).
@@ -170,14 +167,11 @@ main(int argc, char *argv[])
             for (j = 0; j < ny_proc; j++)
             {
                 /*
-                 * Need to make sure that when the shift factor x/y_dim_start
-                 * is applied, that the bounds of the array are not breached
-                 * leading to a seg fault
+                 * Add a displacement factor to make sure we are picking
+                 * buff from the correct place of masterbuff for the process
                  */
-                if ((ii = x_dim_start+i) > nx - 1)
-                    ii = nx - 1;
-                if ((jj = y_dim_start+j) > ny - 1)
-                    jj = ny - 1;
+                ii = x_dim_start+i;
+                jj = y_dim_start+j;
 
                 buff[i][j] = master_buff[ii][jj];
             }
@@ -236,7 +230,7 @@ main(int argc, char *argv[])
         * Send and recieve halo cells data from up and down
         * neighbouring processes -- use the halo datatype to send columns
         */
-        if (NDIMS == 2 && use_ndim1 == FALSE)
+        if (NDIMS == 2)
         {
             MPI_Issend(&old[1][ny_proc], 1, send_halo_vector, nbrs[UP],
                     DEFAULT_TAG, cart_comm, &proc_request);
@@ -299,7 +293,7 @@ main(int argc, char *argv[])
                 {
                     if (proc == MASTER_PROCESS)
                     {
-                        printf("\nImage converted after %d iterations.\n",
+                        printf("Image converted after %d iterations.\n",
                             iter);
                         if (verbose == TRUE)
                             printf("max_delta = %f\n", max_delta_all_procs);
@@ -315,18 +309,43 @@ main(int argc, char *argv[])
         * work load so printing out the progress report on the master processes
         * should be an accurate for all processes
         */
-        if ((iter % out_freq == 0) && (iter < n_iters) && \
-            (proc == MASTER_PROCESS))
+        if (iter % out_freq == 0)
         {
-            printf("%d iterations complete.\n", iter);
-        }
-        else if ((iter == n_iters) && (proc == MASTER_PROCESS))
-        {
-            printf("%d iterations complete.\n", iter);
-            printf("\nIterations complete. However, the image may not");
-            printf(" be fully processed yet.\n");
-            if (verbose == TRUE)
-                printf("max_delta = %f\n", max_delta_all_procs);
+            /*
+             * Calculate the average pixel value over all processes
+             */
+            pixel_average = find_average_pixels(old, nx_proc, ny_proc);
+
+            MPI_Allreduce(&pixel_average, &pixel_average_procs, 1, MPI_DOUBLE,
+                          MPI_SUM, cart_comm);
+
+            pixel_average_procs /= n_procs;
+
+            if (iter < n_iters)
+            {
+                if (proc == MASTER_PROCESS)
+                {
+                    printf("%d iterations complete.\n", iter);
+                    printf("Average pixel value for image: %f.\n\n",
+                        pixel_average_procs);
+                }
+
+                if (verbose == TRUE)
+                    printf("Average pixel value for process %d: %f.\n", proc,
+                           pixel_average);
+            }
+            else if ((iter == n_iters) && (proc == MASTER_PROCESS))
+            {
+                printf("%d iterations complete.\n", iter);
+                printf("\nIterations complete. However, the image may not");
+                printf(" be fully processed yet.\n");
+                if (verbose == TRUE)
+                {
+                    printf("max_delta = %f\n", max_delta_all_procs);
+                    printf("Average pixel value for image: %f.\n",
+                           pixel_average_procs);
+                }
+            }
         }
     }
 
@@ -347,23 +366,21 @@ main(int argc, char *argv[])
         }
     }
 
-    free(dims); free(dim_period); free(coords); free(bounds); free(nbrs);
-    free(old); free(new); free(edge);
+    free(dims); free(dim_period); free(coords); free(nbrs); free(old);
+    free(new); free(edge);
 
     /*
      * Gather all the buff's back into the masterbuff on the master process
      */
-    if (NDIMS == 1 || use_ndim1 == TRUE)
+    if (NDIMS == 1)
     {
         /*
          * For 1 dimension, just use the good ol' MPI_Gather
          */
-        print_break(proc, "gather start");
         MPI_Gather(&buff[0][0], nx_proc*ny_proc, MPI_DOUBLE, &master_buff[0][0],
                    nx_proc*ny_proc, MPI_DOUBLE, MASTER_PROCESS, cart_comm);
-        print_break(proc, "gather end");
     }
-    else if (NDIMS == 2 && use_ndim1 == FALSE)
+    else if (NDIMS == 2)
     {
         if (proc != MASTER_PROCESS)
         {
@@ -379,7 +396,7 @@ main(int argc, char *argv[])
             for (i = 0; i < nx_proc; i++)
             {
                 /*
-                 * Easy to copy and paste
+                 * Copy the buff into the master buff for MASTER PROCESS
                  */
                 for (j = 0; j < ny_proc; j++)
                 {
@@ -387,6 +404,10 @@ main(int argc, char *argv[])
                 }
             }
 
+            /*
+             * Receive buff from all other processes which aren't the MASTER
+             * process to reconstruct buff
+             */
             for (r_iter = 1; r_iter < n_procs; r_iter++)
             {
                 MPI_Recv(
@@ -408,8 +429,13 @@ main(int argc, char *argv[])
     if (proc == MASTER_PROCESS)
     {
         pgmwrite(out_filename, &master_buff[0][0], nx, ny);
-        printf("Time required for image conversion: %9.6f seconds.\n\n",
+        printf("Time required for image conversion: %9.6f seconds.\n",
             (parallel_iters_end - parallel_iters_start));
+        printf("Average time per process: %9.6f seconds.\n",
+               (parallel_iters_end - parallel_iters_start)/n_procs);
+
+        printf("\nTotal parallel runtime: %9.6f seconds.\n",
+            parallel_end - parallel_begin);
     }
 
     free(master_buff);
@@ -417,6 +443,10 @@ main(int argc, char *argv[])
 
     return 0;
 }
+
+/* **************************************************************************
+ * Use this to print a break message lmao. msg is just a string.
+ * ************************************************************************** */
 
 void
 print_break(int proc, char *msg)

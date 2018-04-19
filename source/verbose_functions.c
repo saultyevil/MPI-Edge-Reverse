@@ -5,7 +5,7 @@
 #include "image_functions.h"
 
 int
-print_coords(int *coords, int proc, int n_procs)
+print_coords(int *coords, int proc, int n_procs, int ndims)
 {
     int proc_iter, v_iter;
 
@@ -14,7 +14,7 @@ print_coords(int *coords, int proc, int n_procs)
         if (proc == proc_iter)
         {
             printf("Proc %d: coords (", proc);
-            for (v_iter = 0; v_iter < NDIMS; v_iter++)
+            for (v_iter = 0; v_iter < ndims; v_iter++)
             {
                 printf(" %d ", coords[v_iter]);
             }
@@ -26,14 +26,14 @@ print_coords(int *coords, int proc, int n_procs)
 }
 
 int
-print_dims(int *dims, int proc)
+print_dims(int *dims, int proc, int ndims)
 {
     int i;
 
     if (proc == MASTER_PROCESS)
     {
         printf("Dims (");
-        for (i = 0; i < NDIMS; i++)
+        for (i = 0; i < ndims; i++)
         {
             printf(" %d ", dims[i]);
         }
@@ -44,42 +44,15 @@ print_dims(int *dims, int proc)
 }
 
 int
-print_boundaries(int *bounds, int *coords, int proc, int n_procs)
+print_dims_coords(int *dims, int *coords, int proc, int n_procs, MPI_Comm comm,
+    int ndims)
 {
-    int proc_iter, v_iter;
+    if ((proc == MASTER_PROCESS) && (ndims == 1))
+        printf("\nCan produce some garbage output for ndims = 1.\n");
 
-    for (proc_iter = 0; proc_iter < n_procs; proc_iter++)
-    {
-        if (proc == proc_iter)
-        {
-            printf("proc %d bounds[LEFT] %d bounds[RIGHT] %d bounds[UP] %d ",
-                   proc, bounds[LEFT], bounds[RIGHT], bounds[UP]);
-            printf("bounds[DOWN] %d\n", bounds[DOWN]);
-        }
-    }
-
-    return 0;
-}
-
-int
-print_dims_coords(int *dims, int *coords, int proc, int n_procs, MPI_Comm comm)
-{
-    if ((proc == MASTER_PROCESS) && (NDIMS == 1))
-        printf("\nWill produce some garbage output for NDIMS = 1.\n");
-
-    print_dims(dims, proc);
+    print_dims(dims, proc, ndims);
     MPI_Barrier(comm);
-    print_coords(coords, proc, n_procs);
-    MPI_Barrier(comm);
-
-    return 0;
-}
-
-int
-print_coord_boundaries(int *bounds, int *coords, int proc, int n_procs,
-    MPI_Comm comm)
-{
-    print_boundaries(bounds, coords, proc, n_procs);
+    print_coords(coords, proc, n_procs, ndims);
     MPI_Barrier(comm);
 
     return 0;
