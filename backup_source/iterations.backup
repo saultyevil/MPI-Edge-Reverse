@@ -12,7 +12,8 @@
 int
 compute_iterations(double **old, double **new, double **edge, int *nbrs,
     int nx_proc, int ny_proc, int proc, int max_iters, double delta_stop,
-    int check_freq, int out_freq, int verbose, MPI_Comm cart_comm)
+    int check_freq, int out_freq, int verbose, MPI_Datatype halo_vector,
+    MPI_Comm cart_comm)
 {
     int i, j, iter;
     double delta_proc, max_delta_proc, max_delta_all_procs;
@@ -27,7 +28,8 @@ compute_iterations(double **old, double **new, double **edge, int *nbrs,
     {
         /*
         * Send and recieve halo cells data from left and right
-        * neighbouring processes
+        * neighbouring processes -- the same as with the 1D case study case
+        * it just works, so why not re-use it?
         */
         MPI_Issend(&old[nx_proc][1], ny_proc, MPI_DOUBLE, nbrs[RIGHT],
                 DEFAULT_TAG, cart_comm, &proc_request);
@@ -43,19 +45,19 @@ compute_iterations(double **old, double **new, double **edge, int *nbrs,
 
         /*
         * Send and recieve halo cells data from up and down
-        * neighbouring processes
+        * neighbouring processes -- use the halo datatype to send columns
         */
-        // MPI_Issend(&old[1][ny_proc], nx_proc, MPI_DOUBLE, nbrs[UP],
-        //            DEFAULT_TAG, cart_comm, &proc_request);
-        // MPI_Recv(&old[1][0], nx_proc, MPI_DOUBLE, nbrs[DOWN],
-        //          DEFAULT_TAG, cart_comm, &recv_status);
-        // MPI_Wait(&proc_request, &recv_status);
+        MPI_Issend(&old[1][ny_proc], 1, halo_vector, nbrs[UP],
+                   DEFAULT_TAG, cart_comm, &proc_request);
+        MPI_Recv(&old[1][0], 1, halo_vector, nbrs[DOWN],
+                 DEFAULT_TAG, cart_comm, &recv_status);
+        MPI_Wait(&proc_request, &recv_status);
 
-        // MPI_Issend(&old[1][1], nx_proc, MPI_DOUBLE, nbrs[DOWN],
-        //            DEFAULT_TAG, cart_comm, &proc_request);
-        // MPI_Recv(&old[1][ny_proc+1], nx_proc, MPI_DOUBLE, nbrs[UP],
-        //          DEFAULT_TAG, cart_comm, &recv_status);
-        // MPI_Wait(&proc_request, &recv_status);
+        MPI_Issend(&old[1][1], 1, halo_vector, nbrs[DOWN],
+                   DEFAULT_TAG, cart_comm, &proc_request);
+        MPI_Recv(&old[1][ny_proc+1], 1, halo_vector, nbrs[UP],
+                 DEFAULT_TAG, cart_comm, &recv_status);
+        MPI_Wait(&proc_request, &recv_status);
 
         /*
         * Calculate the value each pixel depending on its neighbouring pixels

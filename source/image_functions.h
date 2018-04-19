@@ -29,21 +29,9 @@ int read_string(char *par_string, char *parameter);
 /*
  * Function used to split up the main function
  */
-int compute_iterations(double **old, double **new, double **edge, int *nbrs,
-    int nx_proc, int ny_proc, int proc, int max_iters, double delta_stop,
-    int check_freq, int out_freq, int verbose, MPI_Comm cart_comm);
-
-MPI_Comm create_topology(int *dims, int *dim_period, int *nbrs, int *coords,
-         int nx, int ny, int *nx_proc, int *ny_proc, int *proc, int n_procs,
-         int reorder, int displacement);
-
-int calculate_boundaries(int *bounds, int *proc_coords, int nx_proc,
-    int ny_proc, int proc);
-
-int init_arrays(double **edge, double **old, double **buff, int nx_proc,
-    int ny_proc);
-
-int copy_to_buff(double **old, double **buff, int nx_proc, int ny_proc);
+MPI_Comm create_topology(int ndims, int *dims, int *dim_period, int *nbrs,
+         int *coords, int nx, int ny, int *nx_proc, int *ny_proc, int *proc,
+         int n_procs, int reorder, int displacement);
 
 /*
  * Functions for verbose printing
@@ -55,5 +43,9 @@ int print_dims_coords(int *dims, int *coords, int proc, int n_procs,
     MPI_Comm comm);
 int print_coord_boundaries(int *bounds, int *coords, int proc, int n_procs,
     MPI_Comm comm);
+int print_n_proc(int proc, int nx, int ny);
 
-
+/*
+ * Functions for debugging
+ */
+void print_break(int proc, char *msg);

@@ -1,0 +1,117 @@
+#include <mpi.h>
+
+#include "image_constants.h"
+
+/* **************************************************************************
+ * Scatters master_buff over the different processes
+ * ************************************************************************** */
+
+int
+scatter_buffer(double **master_buff, double **buff, int *x_coords,
+    int *y_coords, int nx_proc, int ny_proc, int proc, int n_procs,
+    MPI_Datatype send_vector, MPI_Comm cart_comm)
+{
+    int i, j, send_iter;
+    MPI_Status recv_status;
+
+    if (NDIMS == 1)
+    {
+        /*
+         * For 1 dimension, just use the good ol' MPI_Scatter
+         */
+        MPI_Scatter(&master_buff[0][0], nx_proc*ny_proc, MPI_DOUBLE,
+                    &buff[0][0], nx_proc*ny_proc, MPI_DOUBLE, MASTER_PROCESS,
+                    cart_comm);
+    }
+    else if (NDIMS == 2)
+    {
+        /*
+         * Send the masterbuffer sections to the relevant process. Use
+         * synchronous send and recieve to make sure that everything gets the
+         * buffer before doing any computation
+         */
+        if (proc == MASTER_PROCESS)
+        {
+            /*
+             * As we are on the master process, we can just do a quick copy
+             * job without having to send and receive messages :-)
+             */
+            for (i = 0; i < nx_proc; i++)
+            {
+                for (j = 0; j < ny_proc; j++)
+                {
+                    buff[i][j] = master_buff[i][j];
+                }
+            }
+
+            for (send_iter = 1; send_iter < n_procs; send_iter++)
+            {
+                MPI_Ssend(&master_buff[x_coords[send_iter] * nx_proc] \
+                          [y_coords[send_iter] * ny_proc], 1,
+                          send_vector, send_iter, DEFAULT_TAG, cart_comm);
+            }
+        }
+        else
+        {
+            MPI_Recv(&buff[0][0], nx_proc*ny_proc, MPI_DOUBLE, MASTER_PROCESS,
+                     DEFAULT_TAG, cart_comm, &recv_status);
+        }
+    }
+
+    return 0;
+}
+
+/* **************************************************************************
+ * Gathers buff from the other processes into the MASTER PROCESS buffer
+ * ************************************************************************** */
+
+int
+gather_buffer(double **master_buff, double **buff, int *x_coords,
+    int *y_coords, int nx_proc, int ny_proc, int proc, int n_procs,
+    MPI_Datatype send_vector, MPI_Comm cart_comm)
+{
+    int i, j, recv_iter;
+    MPI_Status recv_status;
+
+    if (NDIMS == 1)
+    {
+        /*
+         * For 1 dimension, just use the good ol' MPI_Gather
+         */
+        MPI_Gather(&buff[0][0], nx_proc*ny_proc, MPI_DOUBLE, &master_buff[0][0],
+                   nx_proc*ny_proc, MPI_DOUBLE, MASTER_PROCESS, cart_comm);
+    }
+    else if (NDIMS == 2)
+    {
+        /*
+         * Send buff from all none MASTER PROCESS processes to the master
+         * processes using syncrhornous send and receives to make sure
+         * everything is sent and received
+         */
+        if (proc != MASTER_PROCESS)
+        {
+            MPI_Ssend(&buff[0][0], nx_proc * ny_proc, MPI_DOUBLE,
+                      MASTER_PROCESS, DEFAULT_TAG, cart_comm);
+        }
+        else
+        {
+            for (i = 0; i < nx_proc; i++)
+            {
+                for (j = 0; j < ny_proc; j++)
+                {
+                    master_buff[i][j] = buff[i][j];
+                }
+            }
+
+            for (recv_iter = 1; recv_iter < n_procs; recv_iter++)
+            {
+                MPI_Recv(&master_buff[x_coords[recv_iter] * nx_proc] \
+                         [y_coords[recv_iter] * ny_proc], 1,
+                         send_vector, recv_iter, DEFAULT_TAG, cart_comm,
+                         &recv_status);
+            }
+        }
+    }
+
+    return 0;
+}

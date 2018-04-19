@@ -40,4 +40,4 @@
  * Other constants
  */
 #define TRUE 1
-#define FALE 0
+#define FALSE 0

@@ -128,13 +128,13 @@ void *arralloc(size_t size, int ndim, ...)
    }
    va_end(ap);
 
-
    /*
     *  Allocate space  for pointers and data.
     */
    if( (start = (void**)malloc(
 		(size_t)((n_data*size)+align_size+(n_ptr*sizeof(void**))))) == 0)
       return 0;
+      
    /*
     * Set up pointers to form dope-vector array.
     */

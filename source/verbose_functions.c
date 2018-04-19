@@ -32,7 +32,7 @@ print_dims(int *dims, int proc)
 
     if (proc == MASTER_PROCESS)
     {
-        printf("\nDims (");
+        printf("Dims (");
         for (i = 0; i < NDIMS; i++)
         {
             printf(" %d ", dims[i]);
@@ -81,6 +81,17 @@ print_coord_boundaries(int *bounds, int *coords, int proc, int n_procs,
 {
     print_boundaries(bounds, coords, proc, n_procs);
     MPI_Barrier(comm);
+
+    return 0;
+}
+
+int
+print_n_proc(int proc, int nx, int ny)
+{
+    if (proc == MASTER_PROCESS)
+    {
+        printf("\nnx_proc %d ny_proc %d\n", nx, ny);
+    }
 
     return 0;
 }

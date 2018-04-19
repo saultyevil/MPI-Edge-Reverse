@@ -3,8 +3,12 @@
 #include "image_constants.h"
 #include "image_functions.h"
 
+/* **************************************************************************
+ * Calculate the X and Y boundaries for a process
+ * ************************************************************************** */
+
 int
-calculate_boundaries(int *bounds, int *proc_coords, int nx_proc, int ny_proc,
+calculate_2D_boundaries(int *bounds, int *proc_coords, int nx_proc, int ny_proc,
     int proc)
 {
     bounds[LEFT] = proc_coords[0] * nx_proc;          // left x boundary

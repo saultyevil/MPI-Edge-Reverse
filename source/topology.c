@@ -13,11 +13,11 @@
  * ************************************************************************** */
 
 MPI_Comm
-create_topology(int *dims, int *dim_period, int *nbrs, int *coords, int nx,
-    int ny, int *nx_proc, int *ny_proc, int *proc, int n_procs, int reorder,
-    int displacement)
+create_topology(int ndims, int *dims, int *dim_period, int *nbrs, int *coords,
+    int nx, int ny, int *nx_proc, int *ny_proc, int *proc, int n_procs,
+    int reorder, int displacement)
 {
-    int i, j;
+    int i;
     MPI_Comm cart_comm;
 
     for (i = 0; i < NDIMS; i++)
@@ -26,26 +26,26 @@ create_topology(int *dims, int *dim_period, int *nbrs, int *coords, int nx,
         dim_period[i] = 0;
     }
 
-    MPI_Dims_create(n_procs, NDIMS, dims);
-    MPI_Cart_create(DEFAULT_COMM, NDIMS, dims, dim_period, reorder, &cart_comm);
+    MPI_Dims_create(n_procs, ndims, dims);
+    MPI_Cart_create(DEFAULT_COMM, ndims, dims, dim_period, reorder, &cart_comm);
     MPI_Comm_rank(cart_comm, proc);
-    MPI_Cart_coords(cart_comm, *proc, NDIMS, coords);
+    MPI_Cart_coords(cart_comm, *proc, ndims, coords);
     MPI_Cart_shift(cart_comm, XDIR, displacement, &nbrs[LEFT], &nbrs[RIGHT]);
     MPI_Cart_shift(cart_comm, YDIR, displacement, &nbrs[DOWN], &nbrs[UP]);
 
     *nx_proc = (int) ceil((double) nx/dims[0]);
 
-    if (NDIMS == 1)
+    if (ndims == 1)
     {
         *ny_proc = ny;  // legacy 1D option :-)
     }
-    else if (NDIMS == 2)
+    else if (ndims == 2)
     {
         *ny_proc = (int) ceil((double) ny/dims[1]);
     }
     else
     {
-        printf("NDIMS %d is too large.\n\n", NDIMS);
+        printf("ndims %d is too large.\n\n", ndims);
         MPI_Finalize();
         exit(1);
     }
