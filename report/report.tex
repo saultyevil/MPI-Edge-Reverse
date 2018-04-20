@@ -1,0 +1,32 @@
+\documentclass[11pt, a4paper]{article}
+
+\usepackage{fancyhdr} 					             % header and footer tools for the page style
+\usepackage{hyperref} 					              % adds hyperlinks to navigate the document
+\usepackage{graphicx} 					              % provides extra arguments for \includegraphics[keyvals]{imagefile}
+\usepackage[margin=2.2cm]{geometry}		  % modify the geometry of the document
+\usepackage[hang,flushmargin]{footmisc}   % modify footnotes - used here to remove the footnote indentation
+\usepackage{minted}                                    % insert code
+
+% remove the footnote rule
+\renewcommand*\footnoterule{}
+
+\begin{document}
+
+	\title{Advanced Computational Methods II: Parallel Image Processing Using the Message Passing Interface}
+	\author{Edward John Parkinson}
+	\maketitle	
+	
+	\section{Introduction}
+		Modern computational intensive tasks rely heavily on parallel computing. One of the available methods to construct a parallel program is the \textit{Message Passing Interface} (MPI). MPI allows multiple processes over multiple machines to communicate with each other, allowing sharing of the private data each process has. MPI handles this communication with a collection of functions which sends and receives messages between processes. These communication functions allow a program to be split up into multiple smaller problems, which are run in parallel. For example, a computational grid could be split up into four sections over four processes and MPI can be used to allow communication of the edge data of each process. 
+		
+		In this report, the use of MPI for parallel image processing is presented. The presented algorithm enables an edge image to be reverse engineered back into its original image. As this procedure requires an iterative approach with a heavy amount of computation and boundary swapping per iteration, parallel image processing provides a reasonable benchmark for parallel scaling studies.
+		
+		In this report I will detail the implementation of the image construction algorithm, presenting a number of correctness tests and scalability results. I will finish with by detailing areas for improvement for the algorithm and some closing remarks.
+	
+	\section{Implementation}
+	
+	\section{Performance}
+	
+	\section{Conclusion}
+		
+\end{document}

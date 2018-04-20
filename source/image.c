@@ -47,6 +47,8 @@ main(int argc, char *argv[])
     pgmsize(in_filename, &nx, &ny);
     double **master_buff = arralloc(sizeof(*master_buff), 2, nx, ny);
 
+    double read_file_begin = MPI_Wtime();
+
     if (proc == MASTER_PROCESS)
     {
         pgmread(in_filename, &master_buff[0][0], nx, ny);
@@ -60,7 +62,11 @@ main(int argc, char *argv[])
         printf("----------------------\n");
     }
 
+    double read_file_end = MPI_Wtime();
+
     free(in_filename);
+
+    double topology_begin = MPI_Wtime();
 
     /*
      * Calculate the boundaries for each process.
@@ -87,8 +93,7 @@ main(int argc, char *argv[])
      * the program should report to use the NDIM = 1 case and decompose the
      * domain into a series of strips
      */
-    if ((nx % nx_proc != 0 || ny % ny_proc != 0) &&  (NDIMS == 2) \
-        && (proc == MASTER_PROCESS))
+    if ((nx % nx_proc != 0 || ny % ny_proc != 0) && (proc == MASTER_PROCESS))
     {
         printf("\nImage is not cleanly divisible into an equal squares.\n");
         printf("Try using NDIMS = 1 in image_constants.h or change the");
@@ -136,6 +141,7 @@ main(int argc, char *argv[])
     MPI_Gather(&coords[1], 1, MPI_INT, y_dims, 1, MPI_INT, MASTER_PROCESS,
                cart_comm);
 
+    double topology_end = MPI_Wtime();
     double parallel_begin = MPI_Wtime();
     double input_begin = MPI_Wtime();
 
@@ -434,8 +440,12 @@ main(int argc, char *argv[])
 
     free(x_dims); free(y_dims); free(buff);
 
+    double write_to_file_begin = MPI_Wtime();
+
     if (proc == MASTER_PROCESS)
         pgmwrite(out_filename, &master_buff[0][0], nx, ny);
+
+    double write_to_file_end = MPI_Wtime();
 
     free(master_buff); free(out_filename);
 
@@ -448,21 +458,40 @@ main(int argc, char *argv[])
      */
     if (proc == MASTER_PROCESS)
     {
-        printf("\nTime required for image conversion: %9.6f seconds.\n",
-            parallel_iters_end-parallel_iters_start);
-        printf("Average time per process: %9.6f seconds.\n",
-               (parallel_iters_end-parallel_iters_start)/n_procs);
+        FILE *out_file;
+
+        double parallel_time = parallel_end-parallel_begin;
+        double time_per_process = (parallel_iters_end-parallel_iters_start)/ \
+            n_procs;
+        double time_per_iter = n_procs * (parallel_iters_end - \
+            parallel_iters_start)/(nx_proc * ny_proc);
+        double file_input = input_end - input_begin;
+        double file_output = output_end - output_begin;
+        double total_runtime = program_end - program_begin;
+
+        printf("Average time per process: %9.6f seconds.\n", time_per_process);
         printf("Average time per process iter: %9.6f seconds.\n",
-               n_procs * (parallel_iters_end - parallel_iters_start)/ \
-               (nx_proc*ny_proc));
-        printf("Time required for file input: %9.6f seconds.\n",
-               input_end-input_begin);
-        printf("Time required for file output: %9.6f seconds.\n",
-               output_end-output_begin);
-        printf("\nTotal program runtime: %9.6f seconds.\n",
-               program_end-program_begin);
-        printf("Total parallel runtime: %9.6f seconds.\n",
-            parallel_end-parallel_begin);
+                time_per_iter);
+        printf("Time required for file input: %9.6f seconds.\n", file_input);
+        printf("Time required for file output: %9.6f seconds.\n", file_output);
+        printf("\nTotal program runtime: %9.6f seconds.\n", total_runtime);
+        printf("Total parallel runtime: %9.6f seconds.\n", parallel_time);
+
+        if ((out_file = fopen("runtimes.txt", "a")) == NULL)
+        {
+            printf("Can't open file.\n");
+            exit(1);
+        }
+
+        fprintf(out_file, "%d%d %d %f %f %f %f %f %f\n",
+                nx, ny, n_procs, parallel_time, time_per_process, time_per_iter,
+                file_input, file_output, total_runtime);
+
+        if (fclose(out_file) != 0)
+        {
+            printf("File couldn't be closed.\n");
+            exit(1);
+        }
     }
 
     return 0;
