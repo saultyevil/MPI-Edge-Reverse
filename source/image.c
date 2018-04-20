@@ -9,8 +9,8 @@
 int
 main(int argc, char *argv[])
 {
-        int verbose;  // var for enabling verbose output
-    int i, j, ii, jj, iter, p_iter, r_iter;  // vars for iterations
+    int verbose;  // var for enabling verbose output
+    int i, j, ii, jj, iter, p_iter, s_iter, r_iter;  // vars for iterations
     int n_iters, check_freq, out_freq;       // vars for output
     int nx, ny, nx_proc, ny_proc, proc, n_procs;  // vars for processes
     int x_dim, y_dim, x_dim_start, y_dim_start;  // vars for process domains
@@ -30,6 +30,8 @@ main(int argc, char *argv[])
     MPI_Comm_rank(DEFAULT_COMM, &proc);
     MPI_Comm_size(DEFAULT_COMM, &n_procs);
 
+    double program_begin = MPI_Wtime();
+
     /*
      * Read in the parameters, filename etc, from an external config file, then
      * read in the image using pgmread provided by our friend David.
@@ -44,10 +46,10 @@ main(int argc, char *argv[])
 
     pgmsize(in_filename, &nx, &ny);
     double **master_buff = arralloc(sizeof(*master_buff), 2, nx, ny);
-    pgmread(in_filename, &master_buff[0][0], nx, ny);
 
     if (proc == MASTER_PROCESS)
     {
+        pgmread(in_filename, &master_buff[0][0], nx, ny);
         printf("\n----------------------\n");
         printf("INPUT_FILENAME: %s\nOUTPUT_FILENAME: %s\nRESOLUTION: %d x %d\n",
                in_filename, out_filename, nx, ny);
@@ -90,7 +92,9 @@ main(int argc, char *argv[])
     {
         printf("\nImage is not cleanly divisible into an equal squares.\n");
         printf("Try using NDIMS = 1 in image_constants.h or change the");
-        printf(" number of processes in use.\n\n");
+        printf(" number of processes in use. A list of working process sizes");
+        printf(" can be found in README.md.\n\n");
+        MPI_Finalize();
         exit(1);
     }
 
@@ -133,6 +137,7 @@ main(int argc, char *argv[])
                cart_comm);
 
     double parallel_begin = MPI_Wtime();
+    double input_begin = MPI_Wtime();
 
     /*
      * Distribute masterbuff into smaller buffs for each process running
@@ -149,32 +154,34 @@ main(int argc, char *argv[])
     else if (NDIMS == 2)
     {
         /*
-         * Very bad and inefficient way of distributing the work :^).
-         * Essentially every thread has its own copy of masterbuff and copies
-         * a section from masterbuff into buff.
+         * The master process will send parts of masterbuff to the other
+         * processes buff's synchronously. This is to ensure that each process
+         * gets their buffer populated
          */
-        x_dim_start = coords[0] * nx_proc;
-        y_dim_start = coords[1] * ny_proc;
-
-        if (verbose == TRUE)
+        if (proc == MASTER_PROCESS)
         {
-            printf("proc %d: x_start %d y_start %d\n",
-                   proc, x_dim_start, y_dim_start);
-        }
-
-        for (i = 0; i < nx_proc; i++)
-        {
-            for (j = 0; j < ny_proc; j++)
+            for (i = 0; i < nx_proc; i++)
             {
-                /*
-                 * Add a displacement factor to make sure we are picking
-                 * buff from the correct place of masterbuff for the process
-                 */
-                ii = x_dim_start+i;
-                jj = y_dim_start+j;
-
-                buff[i][j] = master_buff[ii][jj];
+                for (j = 0; j < ny_proc; j++)
+                {
+                    buff[i][j] = master_buff[i][j];
+                }
             }
+
+            /*
+             * Sending to each process other than root
+             */
+            for (s_iter = MASTER_PROCESS+1; s_iter < n_procs; s_iter++)
+            {
+                MPI_Ssend(
+                &master_buff[x_dims[s_iter]*nx_proc][y_dims[s_iter]*ny_proc],
+                1, send_array_vector, s_iter, DEFAULT_TAG, cart_comm);
+            }
+        }
+        else
+        {
+            MPI_Recv(&buff[0][0], nx_proc*ny_proc, MPI_DOUBLE, MASTER_PROCESS,
+                     DEFAULT_TAG, cart_comm, &recv_status);
         }
     }
 
@@ -198,6 +205,8 @@ main(int argc, char *argv[])
             old[i][j] = 255.0;
         }
     }
+
+    double input_end = MPI_Wtime();
 
     /*
      * Compute the iterations -- time them for parallel computation comparison
@@ -289,6 +298,7 @@ main(int argc, char *argv[])
             {
                 MPI_Allreduce(&max_delta_proc, &max_delta_all_procs, 1,
                             MPI_DOUBLE, MPI_MAX, cart_comm);
+
                 if (max_delta_all_procs < delta_stopping)
                 {
                     if (proc == MASTER_PROCESS)
@@ -353,6 +363,7 @@ main(int argc, char *argv[])
         printf("\n----- END OF ITERATIONS -----\n\n");
 
     double parallel_iters_end = MPI_Wtime();
+    double output_begin = MPI_Wtime();
 
     /*
      * Copy the final image into the buffer -- excluding halo cells i.e.
@@ -408,7 +419,7 @@ main(int argc, char *argv[])
              * Receive buff from all other processes which aren't the MASTER
              * process to reconstruct buff
              */
-            for (r_iter = 1; r_iter < n_procs; r_iter++)
+            for (r_iter = MASTER_PROCESS+1; r_iter < n_procs; r_iter++)
             {
                 MPI_Recv(
                 &master_buff[x_dims[r_iter]*nx_proc][y_dims[r_iter]*ny_proc],
@@ -418,28 +429,41 @@ main(int argc, char *argv[])
         }
     }
 
+    double output_end = MPI_Wtime();
     double parallel_end = MPI_Wtime();
 
-    free(x_dims); free(y_dims);
+    free(x_dims); free(y_dims); free(buff);
+
+    if (proc == MASTER_PROCESS)
+        pgmwrite(out_filename, &master_buff[0][0], nx, ny);
+
+    free(master_buff); free(out_filename);
+
+    double program_end = MPI_Wtime();
 
     MPI_Finalize();
 
-    free(buff);
-
+    /*
+     * Bunch of print commands to print out the timings of the program
+     */
     if (proc == MASTER_PROCESS)
     {
-        pgmwrite(out_filename, &master_buff[0][0], nx, ny);
-        printf("Time required for image conversion: %9.6f seconds.\n",
-            (parallel_iters_end - parallel_iters_start));
+        printf("\nTime required for image conversion: %9.6f seconds.\n",
+            parallel_iters_end-parallel_iters_start);
         printf("Average time per process: %9.6f seconds.\n",
-               (parallel_iters_end - parallel_iters_start)/n_procs);
-
-        printf("\nTotal parallel runtime: %9.6f seconds.\n",
-            parallel_end - parallel_begin);
+               (parallel_iters_end-parallel_iters_start)/n_procs);
+        printf("Average time per process iter: %9.6f seconds.\n",
+               n_procs * (parallel_iters_end - parallel_iters_start)/ \
+               (nx_proc*ny_proc));
+        printf("Time required for file input: %9.6f seconds.\n",
+               input_end-input_begin);
+        printf("Time required for file output: %9.6f seconds.\n",
+               output_end-output_begin);
+        printf("\nTotal program runtime: %9.6f seconds.\n",
+               program_end-program_begin);
+        printf("Total parallel runtime: %9.6f seconds.\n",
+            parallel_end-parallel_begin);
     }
-
-    free(master_buff);
-    free(out_filename);
 
     return 0;
 }
