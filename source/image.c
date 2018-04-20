@@ -14,6 +14,7 @@ main(int argc, char *argv[])
     int n_iters, check_freq, out_freq;       // vars for output
     int nx, ny, nx_proc, ny_proc, proc, n_procs;  // vars for processes
     int x_dim, y_dim, x_dim_start, y_dim_start;  // vars for process domains
+    int nx_proc_start, ny_proc_start, x_disp, y_disp;
 
     double pixel_average, pixel_average_procs;  // vars for average pixel
     double delta_stopping, delta_proc, max_delta_proc, max_delta_all_procs;
@@ -46,12 +47,12 @@ main(int argc, char *argv[])
 
     pgmsize(in_filename, &nx, &ny);
     double **master_buff = arralloc(sizeof(*master_buff), 2, nx, ny);
+    pgmread(in_filename, &master_buff[0][0], nx, ny);  // helps when nx %np != 0
 
     double read_file_begin = MPI_Wtime();
 
     if (proc == MASTER_PROCESS)
     {
-        pgmread(in_filename, &master_buff[0][0], nx, ny);
         printf("\n----------------------\n");
         printf("INPUT_FILENAME: %s\nOUTPUT_FILENAME: %s\nRESOLUTION: %d x %d\n",
                in_filename, out_filename, nx, ny);
@@ -89,28 +90,29 @@ main(int argc, char *argv[])
                                 reorder, disp);
 
     /*
-     * When the domain can't be decomposed into a bunch of nice, even squares,
-     * the program should report to use the NDIM = 1 case and decompose the
-     * domain into a series of strips
+     * These variables are used to track where to start an array -- different to
+     * nx_proc and ny_proc because those state the length of an array for the
+     * process whereas nx_proc_start and ny_proc start are used to figure out
+     * where a proc's array in masterbuff starts
      */
-    if ((nx % nx_proc != 0 || ny % ny_proc != 0) && (proc == MASTER_PROCESS))
-    {
-        printf("\nImage is not cleanly divisible into an equal squares.\n");
-        printf("Try using NDIMS = 1 in image_constants.h or change the");
-        printf(" number of processes in use. A list of working process sizes");
-        printf(" can be found in README.md.\n\n");
-        MPI_Finalize();
-        exit(1);
-    }
+    nx_proc_start = nx_proc;
+    ny_proc_start = ny_proc;
 
     /*
-     * Allocate memory for all of the arrays -- use arralloc because it keeps
-     * array elements contiguous
+     * If the dimensions are not perfectly divisible, make the overlapping
+     * process smaller so it doesn't extend past the boundary and seg fault etc
      */
-    double **buff = arralloc(sizeof(*buff), 2, nx_proc, ny_proc);
-    double **old = arralloc(sizeof(*old), 2, nx_proc+2, ny_proc+2);
-    double **new = arralloc(sizeof(*new), 2, nx_proc+2, ny_proc+2);
-    double **edge = arralloc(sizeof(*edge), 2, nx_proc+2, ny_proc+2);
+    if (coords[0]*nx_proc_start+nx_proc > nx)
+    {
+        nx_proc -= (coords[0] * nx_proc_start + nx_proc) - nx;
+    }
+    if (NDIMS == 2)
+    {
+        if (coords[1]*ny_proc_start+ny_proc > ny)
+        {
+            ny_proc -= (coords[1] * ny_proc_start + ny_proc) - ny;
+        }
+    }
 
     /*
      * Define a MPI vector types for sending sections of arrays
@@ -122,6 +124,15 @@ main(int argc, char *argv[])
     MPI_Type_commit(&send_array_vector);
     MPI_Type_vector(nx_proc, 1, ny_proc+2, MPI_DOUBLE, &send_halo_vector);
     MPI_Type_commit(&send_halo_vector);
+
+    /*
+     * Allocate memory for all of the arrays -- use arralloc because it keeps
+     * array elements contiguous
+     */
+    double **buff = arralloc(sizeof(*buff), 2, nx_proc, ny_proc);
+    double **old = arralloc(sizeof(*old), 2, nx_proc+2, ny_proc+2);
+    double **new = arralloc(sizeof(*new), 2, nx_proc+2, ny_proc+2);
+    double **edge = arralloc(sizeof(*edge), 2, nx_proc+2, ny_proc+2);
 
     if (verbose == TRUE)
     {
@@ -151,6 +162,15 @@ main(int argc, char *argv[])
     if (NDIMS == 1)
     {
         /*
+         * If the dimensions aren't even, can't use MPI_Scatter so exit
+         */
+        if ((nx%nx_proc !=0 || ny%ny_proc != 0) & (proc == MASTER_PROCESS))
+        {
+            printf("\nCan't divide dimensions evenly. Use NDIMS = 2.\n");
+            exit(1);
+        }
+
+        /*
          * For 1 dimension, just use the good ol' MPI_Scatter
          */
         MPI_Scatter(&master_buff[0][0], nx_proc*ny_proc, MPI_DOUBLE,
@@ -160,34 +180,24 @@ main(int argc, char *argv[])
     else if (NDIMS == 2)
     {
         /*
-         * The master process will send parts of masterbuff to the other
-         * processes buff's synchronously. This is to ensure that each process
-         * gets their buffer populated
+         * Very inefficent way to handle reading in data to buff. Essentially
+         * we do this as using MPI_Recv resulted in truncation errors when nx
+         * or ny wasn't divisible by nx_proc or ny_proc. Whilst this is less
+         * efficient than a send and receive as used in buff -> masterbuff,
+         * it at least works :^)
          */
-        if (proc == MASTER_PROCESS)
-        {
-            for (i = 0; i < nx_proc; i++)
-            {
-                for (j = 0; j < ny_proc; j++)
-                {
-                    buff[i][j] = master_buff[i][j];
-                }
-            }
+        x_disp = coords[0] * nx_proc_start;
+        y_disp = coords[1] * ny_proc_start;
 
-            /*
-             * Sending to each process other than root
-             */
-            for (s_iter = MASTER_PROCESS+1; s_iter < n_procs; s_iter++)
-            {
-                MPI_Ssend(
-                &master_buff[x_dims[s_iter]*nx_proc][y_dims[s_iter]*ny_proc],
-                1, send_array_vector, s_iter, DEFAULT_TAG, cart_comm);
-            }
-        }
-        else
+        for (i = 0; i < nx_proc; i++)
         {
-            MPI_Recv(&buff[0][0], nx_proc*ny_proc, MPI_DOUBLE, MASTER_PROCESS,
-                     DEFAULT_TAG, cart_comm, &recv_status);
+            for (j = 0; j < ny_proc; j++)
+            {
+                ii = i + x_disp;
+                jj = j + y_disp;
+
+                buff[i][j] = master_buff[ii][jj];
+            }
         }
     }
 
@@ -428,7 +438,7 @@ main(int argc, char *argv[])
             for (r_iter = MASTER_PROCESS+1; r_iter < n_procs; r_iter++)
             {
                 MPI_Recv(
-                &master_buff[x_dims[r_iter]*nx_proc][y_dims[r_iter]*ny_proc],
+                &master_buff[x_dims[r_iter]*nx_proc_start][y_dims[r_iter]*ny_proc_start],
                 1, send_array_vector, r_iter, DEFAULT_TAG, cart_comm,
                 &recv_status);
             }
