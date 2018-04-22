@@ -288,6 +288,7 @@ main(int argc, char *argv[])
                 delta_proc = (double) fabs(new[i][j] - old[i][j]);
                 if (delta_proc > max_delta_proc)
                     max_delta_proc = delta_proc;
+
             }
         }
 
@@ -338,7 +339,9 @@ main(int argc, char *argv[])
         if (iter % out_freq == 0)
         {
             /*
-             * Calculate the average pixel value over all processes
+             * Calculate the average pixel value over all processes - use
+             * MPI_Allreduce to calculate the sum of the average pixel value
+             * over all processes
              */
             pixel_average = find_average_pixels(old, nx_proc, ny_proc);
 
@@ -487,9 +490,9 @@ main(int argc, char *argv[])
         printf("\nTotal program runtime: %9.6f seconds.\n", total_runtime);
         printf("Total parallel runtime: %9.6f seconds.\n", parallel_time);
 
-        if ((out_file = fopen("runtimes.txt", "a")) == NULL)
+        if ((out_file = fopen("runtime.txt", "a")) == NULL)
         {
-            printf("Can't open file.\n");
+            printf("Runtime file can't be opened! Exiting.\n");
             exit(1);
         }
 
@@ -499,7 +502,7 @@ main(int argc, char *argv[])
 
         if (fclose(out_file) != 0)
         {
-            printf("File couldn't be closed.\n");
+            printf("Runtime output file couldn't be closed! Exiting.\n");
             exit(1);
         }
     }

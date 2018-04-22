@@ -23,10 +23,36 @@
 		
 		In this report I will detail the implementation of the image construction algorithm, presenting a number of correctness tests and scalability results. I will finish with by detailing areas for improvement for the algorithm and some closing remarks.
 	
-	\section{Implementation}
+	\section{Building and Running}
+		\subsection{Building}
+			To build the program, a \texttt{Makefile} has been provided. To use the \texttt{Makefile}, the C compiler macro in the \texttt{Makefile} may need to be changed to the one available on the system the program is being built on. For a desktop or computer, it is recommended to use the \texttt{mpicc} compiler and on a HPC system, such as ARCHER, the compiler should be changed to \texttt{cc} (Cray Compiler) or the equivalent for the HPC system. 
+		
+		\subsection{Parameter File}
+			To make the program more flexible, a parameter file is used to take in multiple runtime parameters. These parameters include,
+				
+				\begin{enumerate}
+					\item \texttt{MAX\char`_ITERS} - the maximum number of iterations the program should do before exiting.
+					\item \texttt{CHECK\char`_FREQ} - the frequency the program should check the pixel values between iterations.
+					\item \texttt{OUTPUT\char`_FREQ} - the frequency at which progress updates should be output.
+					\item \texttt{DELTA} - the desired maximum difference between two iterations for the program to exit.
+					\item \texttt{VERBOSE} - enabling this with 1 will output extra information.
+					\item \texttt{INPUT\char`_FILENAME} - path to the file to be converted.
+					\item \texttt{OUTPUT\char`_FILEAME} - path to where to store the converted image.
+				\end{enumerate}
+			
+			\noindent If any of these parameters are  not provided, the program will be unable to run and will exit. 
 	
+		\subsection{Running}
+			To run the program, the parameter file has to be configured correctly. Once the configuration file is configure correctly, to run the program in serial, type \texttt{./edge2image} in the terminal. To run the program in parallel on a desktop or laptop, the command \texttt{mpirun -n np}, where \texttt{np} is the number of processes to be used, has to be used to create multiple processes. On ARCHER, a program has to be submitted to the work queue to run. Provided with the program is a Portable Batch System (PBS) file which is used to submit the job to the ARCHER queue. To do this, navigate to the \texttt{/work/path/to/directory/} and use the command \texttt{qsub edge2image.pbs} to submit the run to the queue. Within the PBS file, the number or processes can be edited by changing the \texttt{NPROCS} and \texttt{select} variables. The \texttt{select} variable controls how many compute nodes you are requesting access to. On ARCHER, there are 24 processors per node, hence if you want to run 48 processes of your program, you will need \texttt{NPROCS=48}, \texttt{select=2}.
+			
+	
+	\section{Implementation}
+		a
+		
 	\section{Performance}
+		a
 	
 	\section{Conclusion}
+		a
 		
 \end{document}

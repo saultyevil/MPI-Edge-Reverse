@@ -45,7 +45,7 @@ create_topology(int ndims, int *dims, int *dim_period, int *nbrs, int *coords,
     }
     else
     {
-        printf("ndims %d is too large.\n\n", ndims);
+        printf("ndims %d is too large. Exiting.\n\n", ndims);
         MPI_Finalize();
         exit(1);
     }
