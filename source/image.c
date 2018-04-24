@@ -10,11 +10,12 @@ int
 main(int argc, char *argv[])
 {
     int verbose;  // var for enabling verbose output
-    int i, j, ii, jj, iter, p_iter, s_iter, r_iter;  // vars for iterations
+    int i, j, ii, jj, iter, p_iter, r_iter;  // vars for iterations
     int n_iters, check_freq, out_freq;       // vars for output
     int nx, ny, nx_proc, ny_proc, proc, n_procs;  // vars for processes
     int x_dim, y_dim, x_dim_start, y_dim_start;  // vars for process domains
-    int nx_proc_start, ny_proc_start, x_disp, y_disp;
+    int nx_proc_start, ny_proc_start, x_disp, y_disp;  // vars for keeping track
+                                                       // of proc array starts
 
     double pixel_average, pixel_average_procs;  // vars for average pixel
     double delta_stopping, delta_proc, max_delta_proc, max_delta_all_procs;
@@ -23,15 +24,9 @@ main(int argc, char *argv[])
     char *out_filename = malloc(sizeof(*out_filename) * MAX_LINE);
 
     MPI_Comm cart_comm;
-    MPI_Status recv_status;
-    MPI_Request proc_request;
+    MPI_Status recv_status[2*N_NBRS], recv_status_output;
+    MPI_Request proc_request[2*N_NBRS];
     MPI_Datatype send_array_vector, send_halo_vector;
-
-    MPI_Init(NULL, NULL);
-    MPI_Comm_rank(DEFAULT_COMM, &proc);
-    MPI_Comm_size(DEFAULT_COMM, &n_procs);
-
-    double program_begin = MPI_Wtime();
 
     /*
      * Read in the parameters, filename etc, from an external config file, then
@@ -45,6 +40,12 @@ main(int argc, char *argv[])
     read_string("INPUT_FILENAME", in_filename);
     read_string("OUTPUT_FILENAME", out_filename);
 
+    MPI_Init(NULL, NULL);
+    MPI_Comm_rank(DEFAULT_COMM, &proc);
+    MPI_Comm_size(DEFAULT_COMM, &n_procs);
+
+    double program_begin = MPI_Wtime();
+
     pgmsize(in_filename, &nx, &ny);
     double **master_buff = arralloc(sizeof(*master_buff), 2, nx, ny);
     pgmread(in_filename, &master_buff[0][0], nx, ny);  // helps when nx %np != 0
@@ -53,13 +54,14 @@ main(int argc, char *argv[])
 
     if (proc == MASTER_PROCESS)
     {
-        printf("\n----------------------\n");
+        printf("----------------------\n");
         printf("INPUT_FILENAME: %s\nOUTPUT_FILENAME: %s\nRESOLUTION: %d x %d\n",
                in_filename, out_filename, nx, ny);
         printf("MAX_ITERS: %d\nCHECK_FREQ: %d\nOUTPUT_FREQ: %d\nDELTA: %4.2f\n",
                n_iters, check_freq, out_freq, delta_stopping);
-        printf("VERBOSE: %d\nNDIMS: %d\n\nN_PROCS: %d\n", verbose, NDIMS,
-               n_procs);
+        printf("VERBOSE: %d\nNDIMS: %d\n", verbose, NDIMS);
+        printf("----------------------\n");
+        printf("N_PROCS: %d\n", n_procs);
         printf("----------------------\n");
     }
 
@@ -86,28 +88,30 @@ main(int argc, char *argv[])
      * If NDIMS is too large or small, the program will exit in this function
      */
     cart_comm = create_topology(NDIMS, dims, dim_period, nbrs, coords, nx, ny,
-                                &nx_proc, &ny_proc, &proc, n_procs,
+                                &nx_proc_start, &ny_proc_start, &proc, n_procs,
                                 reorder, disp);
 
     /*
-     * These variables are used to track where to start an array -- different to
-     * nx_proc and ny_proc because those state the length of an array for the
-     * process whereas nx_proc_start and ny_proc start are used to figure out
-     * where a proc's array in masterbuff starts
+     * These variables are used to track the length of buff in the x and y
+     * directions for each processes. nx_proc_start and ny_proc_start are used
+     * to track where a process should start to take data from in masterbuff.
      */
-    nx_proc_start = nx_proc;
-    ny_proc_start = ny_proc;
+    nx_proc = nx_proc_start;
+    ny_proc = ny_proc_start;
 
     /*
      * If the dimensions are not perfectly divisible, make the overlapping
-     * process smaller so it doesn't extend past the boundary and seg fault etc
+     * process smaller so it doesn't extend past the boundary and seg fault etc.
+     * Only do this for NDIMS = 2, as it will seg fault with NDIMS = 1 when it
+     * reaches MPI_Scatter or MPI_Gather anyway.
      */
-    if (coords[0]*nx_proc_start+nx_proc > nx)
+     if (NDIMS == 2)
     {
+        if (coords[0]*nx_proc_start+nx_proc > nx)
+        {
         nx_proc -= (coords[0] * nx_proc_start + nx_proc) - nx;
-    }
-    if (NDIMS == 2)
-    {
+        }
+
         if (coords[1]*ny_proc_start+ny_proc > ny)
         {
             ny_proc -= (coords[1] * ny_proc_start + ny_proc) - ny;
@@ -115,15 +119,13 @@ main(int argc, char *argv[])
     }
 
     /*
-     * Define a MPI vector types for sending sections of arrays
-     * send_array_vector - this will send a 2D section of the array between
-     *                     master buff to buff
-     * send_halo_vector - this will send the halos of a specified dimenion
+     * Define a MPI vector type for sending sections rows of an array.
+     *      send_halo_vector - this will send the halos of a specified dimenion
      */
-    MPI_Type_vector(nx_proc, ny_proc, ny, MPI_DOUBLE, &send_array_vector);
-    MPI_Type_commit(&send_array_vector);
     MPI_Type_vector(nx_proc, 1, ny_proc+2, MPI_DOUBLE, &send_halo_vector);
     MPI_Type_commit(&send_halo_vector);
+    MPI_Type_vector(nx_proc, ny_proc, ny, MPI_DOUBLE, &send_array_vector);
+    MPI_Type_commit(&send_array_vector);
 
     /*
      * Allocate memory for all of the arrays -- use arralloc because it keeps
@@ -224,51 +226,45 @@ main(int argc, char *argv[])
 
     double input_end = MPI_Wtime();
 
+    if (proc == MASTER_PROCESS)
+        printf("\n---- BEGINNING ITERATIONS ----\n\n");
     /*
      * Compute the iterations -- time them for parallel computation comparison
      */
     double parallel_iters_start = MPI_Wtime();
 
-    if (proc == MASTER_PROCESS)
-        printf("\n---- BEGINNING ITERATIONS ----\n\n");
-
     for (iter = 1; iter <= n_iters; iter++)
     {
         /*
         * Send and recieve halo cells data from left and right
-        * neighbouring processes -- the same as with the 1D case study case
-        * it just works, so why not re-use it?
+        * neighbouring processes -- the same as with the 1D case study case --
+        * we can send columns of data easily because of how memory is laid
+        * out in C.
         */
         MPI_Issend(&old[nx_proc][1], ny_proc, MPI_DOUBLE, nbrs[RIGHT],
-                DEFAULT_TAG, cart_comm, &proc_request);
-        MPI_Recv(&old[0][1], ny_proc, MPI_DOUBLE, nbrs[LEFT], DEFAULT_TAG,
-                cart_comm, &recv_status);
-        MPI_Wait(&proc_request, &recv_status);
-
+                   DEFAULT_TAG, cart_comm, &proc_request[0]);
+        MPI_Irecv(&old[0][1], ny_proc, MPI_DOUBLE, nbrs[LEFT], DEFAULT_TAG,
+                  cart_comm, &proc_request[1]);
         MPI_Issend(&old[1][1], ny_proc, MPI_DOUBLE, nbrs[LEFT],
-                DEFAULT_TAG, cart_comm, &proc_request);
-        MPI_Recv(&old[nx_proc+1][1], ny_proc, MPI_DOUBLE, nbrs[RIGHT],
-                DEFAULT_TAG, cart_comm, &recv_status);
-        MPI_Wait(&proc_request, &recv_status);
-
+                DEFAULT_TAG, cart_comm, &proc_request[2]);
+        MPI_Irecv(&old[nx_proc+1][1], ny_proc, MPI_DOUBLE, nbrs[RIGHT],
+                  DEFAULT_TAG, cart_comm, &proc_request[3]);
         /*
         * Send and recieve halo cells data from up and down
-        * neighbouring processes -- use the halo datatype to send columns
+        * neighbouring processes -- use the halo datatype to send columns.
+        * When NDIM=1, nbrs[UP]and nbrs[DOWN] will be MPI_PROC_NULL, so it is
+        * quite safe to place these here outside of an IF statement.
         */
-        if (NDIMS == 2)
-        {
-            MPI_Issend(&old[1][ny_proc], 1, send_halo_vector, nbrs[UP],
-                    DEFAULT_TAG, cart_comm, &proc_request);
-            MPI_Recv(&old[1][0], 1, send_halo_vector, nbrs[DOWN],
-                    DEFAULT_TAG, cart_comm, &recv_status);
-            MPI_Wait(&proc_request, &recv_status);
+        MPI_Issend(&old[1][ny_proc], 1, send_halo_vector, nbrs[UP],
+                   DEFAULT_TAG, cart_comm, &proc_request[4]);
+        MPI_Irecv(&old[1][0], 1, send_halo_vector, nbrs[DOWN],
+                  DEFAULT_TAG, cart_comm, &proc_request[5]);
+        MPI_Issend(&old[1][1], 1, send_halo_vector, nbrs[DOWN],
+                   DEFAULT_TAG, cart_comm, &proc_request[6]);
+        MPI_Irecv(&old[1][ny_proc+1], 1, send_halo_vector, nbrs[UP],
+                  DEFAULT_TAG, cart_comm, &proc_request[7]);
 
-            MPI_Issend(&old[1][1], 1, send_halo_vector, nbrs[DOWN],
-                    DEFAULT_TAG, cart_comm, &proc_request);
-            MPI_Recv(&old[1][ny_proc+1], 1, send_halo_vector, nbrs[UP],
-                    DEFAULT_TAG, cart_comm, &recv_status);
-            MPI_Wait(&proc_request, &recv_status);
-        }
+        MPI_Waitall(2*N_NBRS, proc_request, recv_status);
 
         /*
         * Calculate the value each pixel depending on its neighbouring pixels
@@ -288,8 +284,7 @@ main(int argc, char *argv[])
                 delta_proc = (double) fabs(new[i][j] - old[i][j]);
                 if (delta_proc > max_delta_proc)
                     max_delta_proc = delta_proc;
-
-            }
+             }
         }
 
         /*
@@ -378,10 +373,11 @@ main(int argc, char *argv[])
         }
     }
 
+    double parallel_iters_end = MPI_Wtime();
+
     if (proc == MASTER_PROCESS)
         printf("\n----- END OF ITERATIONS -----\n\n");
 
-    double parallel_iters_end = MPI_Wtime();
     double output_begin = MPI_Wtime();
 
     /*
@@ -426,7 +422,7 @@ main(int argc, char *argv[])
             for (i = 0; i < nx_proc; i++)
             {
                 /*
-                 * Copy the buff into the master buff for MASTER PROCESS
+                 * Copy the buff into the master buff for the MASTER PROCESS
                  */
                 for (j = 0; j < ny_proc; j++)
                 {
@@ -441,9 +437,10 @@ main(int argc, char *argv[])
             for (r_iter = MASTER_PROCESS+1; r_iter < n_procs; r_iter++)
             {
                 MPI_Recv(
-                &master_buff[x_dims[r_iter]*nx_proc_start][y_dims[r_iter]*ny_proc_start],
+                &master_buff[x_dims[r_iter]*nx_proc_start] \
+                    [y_dims[r_iter]*ny_proc_start],
                 1, send_array_vector, r_iter, DEFAULT_TAG, cart_comm,
-                &recv_status);
+                &recv_status_output);
             }
         }
     }
