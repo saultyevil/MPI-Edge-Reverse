@@ -10,12 +10,13 @@ int
 main(int argc, char *argv[])
 {
     int verbose;  // var for enabling verbose output
-    int i, j, ii, jj, iter, p_iter, r_iter;  // vars for iterations
+    int i, j, ii, jj, iter, r_iter;  // vars for iterations
     int n_iters, check_freq, out_freq;       // vars for output
     int nx, ny, nx_proc, ny_proc, proc, n_procs;  // vars for processes
     int x_dim, y_dim, x_dim_start, y_dim_start;  // vars for process domains
     int nx_proc_start, ny_proc_start, x_disp, y_disp;  // vars for keeping track
                                                        // of proc array starts
+    int n_requests;  // used for blocking send and recv's
 
     double pixel_average, pixel_average_procs;  // vars for average pixel
     double delta_stopping, delta_proc, max_delta_proc, max_delta_all_procs;
@@ -23,9 +24,19 @@ main(int argc, char *argv[])
     char *in_filename = malloc(sizeof(*in_filename) * MAX_LINE);
     char *out_filename = malloc(sizeof(*out_filename) * MAX_LINE);
 
+    /*
+     * This is a bit of a hacky fix to help deal with switching between 1D
+     * and 2D decomposition :-). We are essentially changing the number of
+     * non-blocking comms in use and being tracked
+     */
+    if (NDIMS == 1)
+        n_requests = 4;
+    if (NDIMS == 2)
+        n_requests = 8;
+
     MPI_Comm cart_comm;
-    MPI_Status recv_status[2*N_NBRS], recv_status_output;
-    MPI_Request proc_request[2*N_NBRS];
+    MPI_Status recv_status[n_requests], recv_status_output;
+    MPI_Request proc_request[n_requests];
     MPI_Datatype send_array_vector, send_halo_vector;
 
     /*
@@ -68,8 +79,6 @@ main(int argc, char *argv[])
     double read_file_end = MPI_Wtime();
 
     free(in_filename);
-
-    double topology_begin = MPI_Wtime();
 
     /*
      * Calculate the boundaries for each process.
@@ -154,8 +163,6 @@ main(int argc, char *argv[])
     MPI_Gather(&coords[1], 1, MPI_INT, y_dims, 1, MPI_INT, MASTER_PROCESS,
                cart_comm);
 
-    double topology_end = MPI_Wtime();
-    double parallel_begin = MPI_Wtime();
     double input_begin = MPI_Wtime();
 
     /*
@@ -253,18 +260,21 @@ main(int argc, char *argv[])
         * Send and recieve halo cells data from up and down
         * neighbouring processes -- use the halo datatype to send columns.
         * When NDIM=1, nbrs[UP]and nbrs[DOWN] will be MPI_PROC_NULL, so it is
-        * quite safe to place these here outside of an IF statement.
+        * somewhat safe to place these here outside of an IF statement.
         */
-        MPI_Issend(&old[1][ny_proc], 1, send_halo_vector, nbrs[UP],
-                   DEFAULT_TAG, cart_comm, &proc_request[4]);
-        MPI_Irecv(&old[1][0], 1, send_halo_vector, nbrs[DOWN],
-                  DEFAULT_TAG, cart_comm, &proc_request[5]);
-        MPI_Issend(&old[1][1], 1, send_halo_vector, nbrs[DOWN],
-                   DEFAULT_TAG, cart_comm, &proc_request[6]);
-        MPI_Irecv(&old[1][ny_proc+1], 1, send_halo_vector, nbrs[UP],
-                  DEFAULT_TAG, cart_comm, &proc_request[7]);
+        if (NDIMS == 2)
+        {
+            MPI_Issend(&old[1][ny_proc], 1, send_halo_vector, nbrs[UP],
+                    DEFAULT_TAG, cart_comm, &proc_request[4]);
+            MPI_Irecv(&old[1][0], 1, send_halo_vector, nbrs[DOWN],
+                    DEFAULT_TAG, cart_comm, &proc_request[5]);
+            MPI_Issend(&old[1][1], 1, send_halo_vector, nbrs[DOWN],
+                    DEFAULT_TAG, cart_comm, &proc_request[6]);
+            MPI_Irecv(&old[1][ny_proc+1], 1, send_halo_vector, nbrs[UP],
+                    DEFAULT_TAG, cart_comm, &proc_request[7]);
+        }
 
-        MPI_Waitall(2*N_NBRS, proc_request, recv_status);
+        MPI_Waitall(n_requests, proc_request, recv_status);
 
         /*
         * Calculate the value each pixel depending on its neighbouring pixels
@@ -446,7 +456,6 @@ main(int argc, char *argv[])
     }
 
     double output_end = MPI_Wtime();
-    double parallel_end = MPI_Wtime();
 
     free(x_dims); free(y_dims); free(buff);
 
@@ -470,7 +479,7 @@ main(int argc, char *argv[])
     {
         FILE *out_file;
 
-        double parallel_time = parallel_end-parallel_begin;
+        double parallel_time = parallel_iters_end-parallel_iters_start;
         double time_per_process = (parallel_iters_end-parallel_iters_start)/ \
             n_procs;
         double time_per_iter = n_procs * (parallel_iters_end - \
