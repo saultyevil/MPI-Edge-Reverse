@@ -17,10 +17,10 @@
 # David Henty, EPCC, 18/09/2016
 #
 
-#PBS -A y14
+#PBS -A y14-CDT-Soton
 #PBS -j oe
-#PBS -l walltime=00:01:00
-#PBS -l select=1
+#PBS -l walltime=00:30:00
+#PBS -l select=5
   
 #----------------------------------------------------------------------#
 # You should only have to change the following parameter NPROC, unless #
@@ -28,12 +28,6 @@
 # The variable "select" should be set to the number of nodes required. #
 # Each node has 24 physical cores so if NPROC=144 then use select=6    #
 #----------------------------------------------------------------------#
-
-NPROC=4
-
-#------------------------------------------------------------------------#
-# You should not have to edit below here for simple MPI jobs             #
-#------------------------------------------------------------------------#
 
 cd $PBS_O_WORKDIR
 
@@ -47,7 +41,20 @@ echo 'Running MPI program' $MPIPROG 'on' $MPISIZE 'processes'
 echo 'Started at' `date`
 echo '--------------------------------------------------------------------------------'
 
-(time aprun -n $MPISIZE ./$MPIPROG) 2>&1
+for i in {1..25}
+    do
+    echo "Repeat: $i"
+    (time aprun -n 1 ./$MPIPROG) 2>&1
+    (time aprun -n 2 ./$MPIPROG) 2>&1
+    (time aprun -n 4 ./$MPIPROG) 2>&1
+    (time aprun -n 8 ./$MPIPROG) 2>&1
+    (time aprun -n 16 ./$MPIPROG) 2>&1
+    (time aprun -n 24 ./$MPIPROG) 2>&1
+    (time aprun -n 48 ./$MPIPROG) 2>&1
+    (time aprun -n 72 ./$MPIPROG) 2>&1
+    (time aprun -n 96 ./$MPIPROG) 2>&1
+    (time aprun -n 120 ./$MPIPROG) 2>&1
+    done
 
 echo '--------------------------------------------------------------------------------'
 echo 'Finished at' `date`

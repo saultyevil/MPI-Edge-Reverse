@@ -259,8 +259,6 @@ main(int argc, char *argv[])
         /*
         * Send and recieve halo cells data from up and down
         * neighbouring processes -- use the halo datatype to send columns.
-        * When NDIM=1, nbrs[UP]and nbrs[DOWN] will be MPI_PROC_NULL, so it is
-        * somewhat safe to place these here outside of an IF statement.
         */
         if (NDIMS == 2)
         {
@@ -319,7 +317,7 @@ main(int argc, char *argv[])
             if (iter != n_iters)
             {
                 MPI_Allreduce(&max_delta_proc, &max_delta_all_procs, 1,
-                            MPI_DOUBLE, MPI_MAX, cart_comm);
+                              MPI_DOUBLE, MPI_MAX, cart_comm);
 
                 if (max_delta_all_procs < delta_stopping)
                 {
@@ -479,11 +477,9 @@ main(int argc, char *argv[])
     {
         FILE *out_file;
 
-        double parallel_time = parallel_iters_end-parallel_iters_start;
-        double time_per_process = (parallel_iters_end-parallel_iters_start)/ \
-            n_procs;
-        double time_per_iter = n_procs * (parallel_iters_end - \
-            parallel_iters_start)/(nx_proc * ny_proc);
+        double parallel_time = parallel_iters_end - parallel_iters_start;
+        double time_per_process = parallel_time/n_procs;
+        double time_per_iter = parallel_time/(double) iter;
         double file_input = input_end - input_begin;
         double file_output = output_end - output_begin;
         double total_runtime = program_end - program_begin;

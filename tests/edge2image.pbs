@@ -19,8 +19,8 @@
 
 #PBS -A y14
 #PBS -j oe
-#PBS -l walltime=00:01:00
-#PBS -l select=1
+#PBS -l walltime=00:05:30
+#PBS -l select=5
   
 #----------------------------------------------------------------------#
 # You should only have to change the following parameter NPROC, unless #
@@ -47,7 +47,20 @@ echo 'Running MPI program' $MPIPROG 'on' $MPISIZE 'processes'
 echo 'Started at' `date`
 echo '--------------------------------------------------------------------------------'
 
-(time aprun -n $MPISIZE ./$MPIPROG) 2>&1
+for i in {1..100}
+    do
+    echo "Repeat: $i"
+    (time aprun -n 1 ./$MPIPROG) 2>&1
+    (time aprun -n 2 ./$MPIPROG) 2>&1
+    (time aprun -n 4 ./$MPIPROG) 2>&1
+    (time aprun -n 8 ./$MPIPROG) 2>&1
+    (time aprun -n 16 ./$MPIPROG) 2>&1
+    (time aprun -n 24 ./$MPIPROG) 2>&1
+    (time aprun -n 48 ./$MPIPROG) 2>&1
+    (time aprun -n 72 ./$MPIPROG) 2>&1
+    (time aprun -n 96 ./$MPIPROG) 2>&1
+    (time aprun -n 120 ./$MPIPROG) 2>&1
+    done
 
 echo '--------------------------------------------------------------------------------'
 echo 'Finished at' `date`
