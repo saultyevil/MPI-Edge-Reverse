@@ -296,8 +296,8 @@ main(int argc, char *argv[])
         }
 
         /*
-        * Set the old values to the new values for next iteration
-        */
+         * Set the old values to the new values for next iteration
+         */
         for (i = 1; i < nx_proc+1; i++)
         {
             for (j = 1; j < ny_proc+1; j++)
@@ -309,11 +309,11 @@ main(int argc, char *argv[])
         if (iter % check_freq == 0)
         {
             /*
-            * If we haven't reached the maximum number of iterations to be
-            * done, check if the image has been converted already. If the
-            * largest pixel difference is smaller than the criterion, break
-            * the loop
-            */
+             * If we haven't reached the maximum number of iterations to be
+             * done, check if the image has been converted already. If the
+             * largest pixel difference is smaller than the criterion, break
+             * the loop
+             */
             if (iter != n_iters)
             {
                 MPI_Allreduce(&max_delta_proc, &max_delta_all_procs, 1,
@@ -420,7 +420,9 @@ main(int argc, char *argv[])
         {
             /*
              * All processes apart from the MASTER PROCESS send their version
-             * of buff to the MASTER PROCESS
+             * of buff to the MASTER PROCESS -- use blocking communication as
+             * it is safer and work can't progress unless MASTER PROCESS has all
+             * of the work anyhow
              */
             MPI_Ssend(&buff[0][0], nx_proc*ny_proc, MPI_DOUBLE,
                 MASTER_PROCESS, DEFAULT_TAG, cart_comm);
