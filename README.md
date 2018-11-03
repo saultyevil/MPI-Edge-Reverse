@@ -57,3 +57,7 @@ If you have compiled with `NDIMS=1`, you will be limited to the number of proces
 512 x 384: 1, 2, 4, 8, 16, 32, 64, 128, 256, 512.
 768 x 768: 1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 128, 192, 256, 384, 768.
 ```
+
+## Acknowledgements 
+
+I would like to acknowledge financial support from the EPSRC Centre for Doctoral Training in Next Generation Computational Modelleing grant EP/L015382/1.
